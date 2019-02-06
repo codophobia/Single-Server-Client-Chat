@@ -7,7 +7,20 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <pthread.h>
-
+void *handler(void *sock)
+{
+	int client_sock = *((int *)sock);
+	char msg[500];
+	int len;
+	while((len = recv(client_sock,msg,500,0)) > 0) {
+		len = send(client_sock,msg,strlen(msg),0);
+		if(len < 0) {
+			perror("message not sent");
+			exit(1);
+		}
+		memset(msg,'\0',sizeof(msg));
+	}
+}
 int main(int argc,char *argv[])
 {
 	struct sockaddr_in server_addr,client_addr;
@@ -17,6 +30,7 @@ int main(int argc,char *argv[])
 	int portno;
 	char msg[500];
 	int len;
+	pthread_t thread;
 	
 	if(argc > 2) {
 		printf("too many arguments");
@@ -35,26 +49,20 @@ int main(int argc,char *argv[])
 		exit(1);
 	}
 
-	if(listen(server_sock,1) != 0) {
+	if(listen(server_sock,5) != 0) {
 		perror("server socket failed to listen");
 		exit(1);
 	}
 
-	if((client_sock = accept(server_sock,(struct sockaddr *)&client_addr,&client_addr_size)) < 0) {
-		perror("server failed to accept client connection");
-		exit(1);
-	}
-	fprintf("hello");
-	
-	while((len = recv(client_sock,msg,500,0)) > 0) {
-		len = send(client_sock,msg,strlen(msg),0);
-		if(len < 0) {
-			perror("message not sent");
+	while(1) {
+		if((client_sock = accept(server_sock,(struct sockaddr *)&client_addr,&client_addr_size)) < 0) {
+			perror("server failed to accept client connection");
 			exit(1);
 		}
-		memset(msg,'\0',sizeof(msg));
+		
+		pthread_create(&thread,NULL,handler,&client_sock);
+		
 	}
-	
 	close(server_sock);
 	return 0;
 }
